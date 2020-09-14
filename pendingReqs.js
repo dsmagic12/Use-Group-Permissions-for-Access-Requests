@@ -92,7 +92,7 @@ var pendingReqs = {
         };
         xhr.send();
     },
-    addUserToGroup: function(userAccount, groupId, rowId, userEmail, fxCallback){
+    addUserToGroup: function(userAccount, groupId, itemId, userEmail, fxCallback){
         var xhr = new XMLHttpRequest();
         xhr.open("POST", pendingReqs.endpoints.groupUsersByGroupId(groupId), false);
         xhr.setRequestHeader("accept","application/json;odata=verbose");
@@ -106,8 +106,14 @@ var pendingReqs = {
             if ( xhr.readyState === 4 ){
                 if ( xhr.status >= 200 && xhr.status < 300 ){
                     var data = JSON.parse(xhr.response);
+                    if ( pendingReqs.settings.bSendEmails === true ) {
+                        pendingReqs.sendEmailNotification(pendingReqs.settings.fromEmailAddress, userEmail, document.querySelector("#selGroup OPTION[value='"+ groupId +"']").innerText);
+                    }
+                    pendingReqs.deleteAccessRequest(itemId, function(itemIdNumber){
+                        SP.UI.Notify.addNotification("<font color='red'>Unable to delete request |"+ itemIdNumber +"|</font>",false);
+                    });
                     if ( typeof(fxCallback) === "function" ){
-                        fxCallback(data.d);
+                        fxCallback(data.d, userAccount, groupId, itemId, userEmail, fxCallback);
                     }
                 }
             }
@@ -188,13 +194,8 @@ var pendingReqs = {
                             pendingReqs.getUserProfileById(userId, function(profile){
                                 userLogin = profile.LoginName;
                                 userEmail = profile.Email;
-                                pendingReqs.addUserToGroup(userLogin, addToGroupId, itemId, userEmail, function(){
-                                    if ( pendingReqs.settings.bSendEmails === true ) {
-                                        pendingReqs.sendEmailNotification(pendingReqs.settings.fromEmailAddress, userEmail, document.querySelector("#selGroup OPTION[value='"+ addToGroupId +"']").innerText);
-                                    }
-                                    pendingReqs.deleteAccessRequest(itemId, function(itemIdNumber){
-                                        SP.UI.Notify.addNotification("<font color='red'>Unable to delete request |"+ itemIdNumber +"|</font>",false);
-                                    });
+                                pendingReqs.addUserToGroup(userLogin, addToGroupId, itemId, userEmail, function(data, userAccount, groupId, itemId, userEmail, fxCallback){
+                                    SP.UI.Notify.addNotification("<font color='green'>Added user |"+ userLogin +"| to group |"+ document.querySelector("#selGroup OPTION[value='"+ addToGroupId +"']").innerText +"|</font>",false);
                                 });
                             });
                         }
