@@ -78,7 +78,7 @@ var pendingReqs = {
     },
     getUserProfileById: function(userId, fxCallback){
         var xhr = new XMLHttpRequest();
-        xhr.open("GET", pendingReqs.endpoints.userProfileById(userId), true);
+        xhr.open("GET", pendingReqs.endpoints.userProfileById(userId), false);
         xhr.setRequestHeader("accept","application/json;odata=verbose");
         xhr.setRequestHeader("content-type","application/json;odata=verbose");
         xhr.setRequestHeader("X-RequestDigest",pendingReqs.formDigest);
@@ -94,7 +94,7 @@ var pendingReqs = {
     },
     addUserToGroup: function(userAccount, groupId, rowId, userEmail, fxCallback){
         var xhr = new XMLHttpRequest();
-        xhr.open("POST", pendingReqs.endpoints.groupUsersByGroupId(groupId), true);
+        xhr.open("POST", pendingReqs.endpoints.groupUsersByGroupId(groupId), false);
         xhr.setRequestHeader("accept","application/json;odata=verbose");
         xhr.setRequestHeader("content-type","application/json;odata=verbose");
         //xhr.setRequestHeader("X-RequestDigest",pendingReqs.formDigest);
@@ -142,9 +142,9 @@ var pendingReqs = {
         xhr.send(JSON.stringify(sendData));
         
     },
-    deleteAccessRequest: function(itemId, fxCallback){
+    deleteAccessRequest: function(itemIdNum, fxCallback){
         var xhr = new XMLHttpRequest();
-        xhr.open("POST", pendingReqs.endpoints.deleteAccessRequestById(itemId), true);
+        xhr.open("POST", pendingReqs.endpoints.deleteAccessRequestById(itemIdNum), true);
         //xhr.setRequestHeader("accept","application/json;odata=verbose");
         //xhr.setRequestHeader("content-type","application/json;odata=verbose");
         xhr.setRequestHeader("IF-MATCH","*");
@@ -154,9 +154,11 @@ var pendingReqs = {
             if ( xhr.readyState === 4 ){
                 if ( xhr.status >= 200 && xhr.status < 400 ){
                     //var data = JSON.parse(xhr.response);
+                    // deleting the pending request doesn't remove it from the page, so hide that table row
+                    document.querySelector("TR[id$=',"+ itemIdNum +",0']").style.display = "none";
                     if ( typeof(fxCallback) === "function" ){
                         //fxCallback(data.d);
-                        fxCallback();
+                        fxCallback(itemIdNum);
                     }
                 }
             }
@@ -165,6 +167,7 @@ var pendingReqs = {
         
     },
     processSelectedRequests: function(){
+        var bFoundSelections = false;
         for ( var ctx in g_ctxDict ) {
             var context = g_ctxDict[ctx];
             //https://docs.microsoft.com/en-us/previous-versions/office/developer/sharepoint-2010/ff409526(v=office.14)
@@ -172,32 +175,36 @@ var pendingReqs = {
             for ( var i = 0; i < selectedItems.length; i++ ){
                 var selection = selectedItems[i];
                 var dataRow = null;
-                context.ListData.Rows.forEach(function(row){
-                    if ( row.ID === selection.id ){
-                        dataRow = row;
-                        var itemId = dataRow.ID;
-                        var userId = dataRow.RequestedForUserId;
-                        var userLogin = "";
-                        var userEmail = "";
-                        var addToGroupId = document.querySelector("#selGroup").value;
-                        pendingReqs.getUserProfileById(userID, function(profile){
-                            userLogin = profile.LoginName;
-                            userEmail = profile.Email;
-                            pendingReqs.addUserToGroup(userLogin, addToGroupId, itemId, userEmail, function(){
-                                if ( pendingReqs.settings.bSendEmails === true ) {
-                                    pendingReqs.sendEmailNotification(pendingReqs.settings.fromEmailAddress, userEmail, document.querySelector("#selGroup OPTION[value='"+ addToGroupId +"']").innerText);
-                                }
-                                pendingReqs.deleteAccessRequest(itemId, function(){
-                                    // deleting the pending request doesn't remove it from the page, so hide that table row
-                                    document.querySelector("TR[id$=',"+ itemId +",0']").style.display = "none";
+                if ( context.ListData.Rows.length > 0 ) {
+                    bFoundSelections = true;
+                    context.ListData.Rows.forEach(function(row){
+                        if ( row.ID === selection.id ){
+                            dataRow = row;
+                            var itemId = dataRow.ID;
+                            var userId = dataRow.RequestedForUserId;
+                            var userLogin = "";
+                            var userEmail = "";
+                            var addToGroupId = document.querySelector("#selGroup").value;
+                            pendingReqs.getUserProfileById(userId, function(profile){
+                                userLogin = profile.LoginName;
+                                userEmail = profile.Email;
+                                pendingReqs.addUserToGroup(userLogin, addToGroupId, itemId, userEmail, function(){
+                                    if ( pendingReqs.settings.bSendEmails === true ) {
+                                        pendingReqs.sendEmailNotification(pendingReqs.settings.fromEmailAddress, userEmail, document.querySelector("#selGroup OPTION[value='"+ addToGroupId +"']").innerText);
+                                    }
+                                    pendingReqs.deleteAccessRequest(itemId, function(itemIdNumber){
+                                        SP.UI.Notify.addNotification("<font color='red'>Unable to delete request |"+ itemIdNumber +"|</font>",false);
+                                    });
                                 });
                             });
-                        });
-                    }
-                });
-                
+                        }
+                    });
+                    break;
+                }
             }
-    
+            if ( bFoundSelections === true ) {
+                break;
+            }
         }
     },
     onLoad: setTimeout(function(){
