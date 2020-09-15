@@ -148,17 +148,35 @@ var pendingReqs = {
         xhr.send(JSON.stringify(sendData));
         
     },
+    getFormDigest: function(){
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", pendingReqs.endpoints.formDigest, true);
+        xhr.setRequestHeader("accept","application/json;odata=verbose");
+        xhr.setRequestHeader("content-type","application/json;odata=verbose");
+        //xhr.setRequestHeader("IF-MATCH","*");
+        //xhr.setRequestHeader("X-HTTP-METHOD","DELETE");
+        //xhr.setRequestHeader("X-RequestDigest",pendingReqs.formDigest);
+        xhr.onreadystatechange = function(){
+            if ( xhr.readyState === 4 ){
+                if ( xhr.status >= 200 && xhr.status < 300 ){
+                    var data = JSON.parse(xhr.response);
+                    pendingReqs.formDigest = data.d.GetContextWebInformation.FormDigestValue;
+                }
+            }
+        };
+        xhr.send();
+    },
     deleteAccessRequest: function(itemIdNum, fxCallback){
         var xhr = new XMLHttpRequest();
         xhr.open("POST", pendingReqs.endpoints.deleteAccessRequestById(itemIdNum), true);
-        //xhr.setRequestHeader("accept","application/json;odata=verbose");
+        xhr.setRequestHeader("accept","application/json;odata=verbose");
         //xhr.setRequestHeader("content-type","application/json;odata=verbose");
         xhr.setRequestHeader("IF-MATCH","*");
         xhr.setRequestHeader("X-HTTP-METHOD","DELETE");
         xhr.setRequestHeader("X-RequestDigest",pendingReqs.formDigest);
         xhr.onreadystatechange = function(){
             if ( xhr.readyState === 4 ){
-                if ( xhr.status >= 200 && xhr.status < 400 ){
+                if ( xhr.status >= 200 && xhr.status < 300 ){
                     //var data = JSON.parse(xhr.response);
                     // deleting the pending request doesn't remove it from the page, so hide that table row
                     document.querySelector("TR[id$=',"+ itemIdNum +",0']").style.display = "none";
@@ -173,6 +191,9 @@ var pendingReqs = {
         
     },
     processSelectedRequests: function(){
+        pendingReqs.getUserProfileById(_spPageContextInfo.userId, function(profile){
+            pendingReqs.settings.fromEmailAddress = profile.Email;
+        });
         var bFoundSelections = false;
         for ( var ctx in g_ctxDict ) {
             var context = g_ctxDict[ctx];
