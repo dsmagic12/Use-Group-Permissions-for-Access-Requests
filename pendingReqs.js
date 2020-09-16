@@ -3,6 +3,15 @@ var pendingReqs = {
         bSendEmails: false,
         fromEmailAddress: "daniel.schauer@foo.bar"
     },
+    intvls: {
+        // used for repeating code
+        refreshformDigest: {
+            intvl: null,
+            pauseMS: 1500,
+            counter: 0,
+            timeoutMS: 9 * 60 * 60 * 1000, // 9 hours
+        }
+    },
     formDigest: "",
     endpoints: {
         getSiteGroups: _spPageContextInfo.siteAbsoluteUrl +"/_api/web/siteGroups",
@@ -161,6 +170,7 @@ var pendingReqs = {
                 if ( xhr.status >= 200 && xhr.status < 300 ){
                     var data = JSON.parse(xhr.response);
                     pendingReqs.formDigest = data.d.GetContextWebInformation.FormDigestValue;
+                    pendingReqs.intvls.refreshformDigest.pauseMS = _spFormDigestRefreshInterval;
                 }
             }
         };
@@ -229,7 +239,21 @@ var pendingReqs = {
             }
         }
     },
+    startAutoRefreshFormDigest: function(){
+        pendingReqs.intvls.refreshformDigest.intvl = setInterval(function(){
+            pendingReqs.intvls.refreshformDigest.counter++;
+            if ( pendingReqs.intvls.refreshformDigest.counter * pendingReqs.intvls.refreshformDigest.pauseMS >= pendingReqs.intvls.refreshformDigest.timeoutMS ){
+                alert("Stopped refreshing form digest");
+                clearInterval(pendingReqs.intvls.refreshformDigest.intvl);
+            }
+            else {
+                pendingReqs.getFormDigest();
+            }
+        },pendingReqs.intvls.refreshformDigest.pauseMS)
+    },
     onLoad: setTimeout(function(){
+        pendingReqs.formDigest = document.getElementById("__REQUESTDIGEST").value;
+        pendingReqs.startAutoRefreshFormDigest();
         pendingReqs.getSiteGroups(undefined, pendingReqs.appendUIControlsAboveView);
     }, 123)
 };
